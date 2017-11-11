@@ -135,7 +135,6 @@ module.exports = {
         this.map = new this.maps.Map(this.$refs.map, {
           center,
           zoom: 13,
-          draggable: false,
           minZoom: 5,
           mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
           disableDefaultUI: true,
