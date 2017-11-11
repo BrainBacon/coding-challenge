@@ -32,10 +32,6 @@ module.exports = {
         width: 64,
         height: 78,
       },
-      size: {
-        width: 64,
-        height: 78,
-      },
     }));
   },
 
@@ -82,46 +78,71 @@ module.exports = {
       return this.styles[i];
     },
 
-    traverse(map, node, resolution, bounds) {
+    traverse(node, resolution, bounds) {
       if (!node) {
         return;
       }
       if (bounds) {
-        if (!node.bounds.intersects(map.getBounds())) {
+        if (!node.bounds.intersects(bounds)) {
           return;
         }
         if (this.surrounds(node, bounds)) {
-          this.traverse(map, node, resolution);
+          this.traverse(node, resolution);
           return;
         }
       }
       if (node.resolution < resolution) {
+        let position;
+        if (node.resolution > 0) {
+          position = new this.maps.LatLng(node.lat, node.lng);
+        } else {
+          position = node.bounds.getCenter();
+        }
         this.markers.push(new this.maps.Marker({
-          map,
-          position: new this.maps.LatLng(node.lat, node.lng),
+          map: this.map,
+          position,
           label: `${node.avg.toFixed(1)}`,
           icon: this.getStyle(node.avg),
         }));
         return;
       }
-      this.traverse(map, node.left, resolution, bounds);
-      this.traverse(map, node.right, resolution, bounds);
+      this.traverse(node.left, resolution, bounds);
+      this.traverse(node.right, resolution, bounds);
     },
 
-    getMarkers(map) {
+    clearMarkers() {
       if (this.markers) {
         this.markers.forEach(marker => marker.setMap(null));
       }
       this.markers = [];
-      let bounds = map.getBounds();
-      let scale = 2 ** map.getZoom();
+    },
+
+    getMarkers() {
+      this.clearMarkers();
+      let bounds = this.map.getBounds();
+      let scale = 2 ** this.map.getZoom();
       let ne = bounds.getNorthEast();
-      let projection = map.getProjection();
+      let projection = this.map.getProjection();
       let point = projection.fromLatLngToPoint(ne);
       let normalize = n => ((n * scale) - GRID_SIZE) / scale;
       let sw = new this.maps.Point(normalize(point.x), normalize(point.y));
       let resolution = this.distance(ne, projection.fromPointToLatLng(sw));
-      this.traverse(map, this.tree, resolution, bounds);
+      this.traverse(this.tree, resolution, bounds);
+    },
+
+    initMap(center) {
+      if (!this.map) {
+        this.map = new this.maps.Map(this.$refs.map, {
+          center,
+          zoom: 13,
+          draggable: false,
+          minZoom: 5,
+          mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
+          disableDefaultUI: true,
+        });
+        this.map.mapTypes.set('styled_map', new this.maps.StyledMapType(style));
+        this.map.setMapTypeId('styled_map');
+      }
     },
 
     async prepare(groups) {
@@ -146,18 +167,9 @@ module.exports = {
       this.tree = this.getTree(kd.root);
       this.loading = false;
       this.ready = true;
-      let map = new this.maps.Map(this.$refs.map, {
-        center,
-        zoom: 13,
-        draggable: false,
-        minZoom: 5,
-        mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
-        disableDefaultUI: true,
-      });
-      map.mapTypes.set('styled_map', new this.maps.StyledMapType(style));
-      map.setMapTypeId('styled_map');
-      map.fitBounds(bounds);
-      this.boundsListener = map.addListener('bounds_changed', () => this.getMarkers(map));
+      this.initMap(center);
+      this.map.fitBounds(bounds);
+      this.boundsListener = this.map.addListener('bounds_changed', () => this.getMarkers());
     },
 
     async submit() {
@@ -180,15 +192,14 @@ module.exports = {
       this.available = false;
       this.loading = true;
       let { data } = await axios.get(tripsUrl);
-      this.prepare([{ coords: data }]);
+      this.prepare(Object.values(data));
     },
 
     reset() {
       this.$refs.form.reset();
       this.maps.event.removeListener(this.boundsListener);
-      delete this.maps;
       delete this.tree;
-      delete this.markers;
+      this.clearMarkers();
       Object.assign(this.$data, this.$options.data.apply(this));
     },
   },
