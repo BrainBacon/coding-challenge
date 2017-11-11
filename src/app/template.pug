@@ -1,0 +1,38 @@
+#main.height-100
+  // h1 Comma AI Coding Challenge
+  transition
+    .header(v-show="ready")
+      .frow.justify-between.height-100.items-center
+        .frow.items-center
+          img(src="./comma-dark.png")
+          span comma.ai
+        a(type="button", @click.prevent="reset") clear
+  transition
+    .map(v-show="ready", ref="map")
+  .frow.centered(v-show="!ready && !loading")
+    form(ref="form", @submit.prevent="submit", novalidate)
+      .frow.gutters
+        .col-xs-1-5
+          .frow.height-100.centered
+            img.logo(src="./comma-white.png")
+        .col-gs-4-5
+          h1 comma.ai
+      .frow.row-start
+        h2 Speed Analysis
+      .frow
+          label.mono.align-center
+            p Select local dataset
+            input.mono(ref="input", @change="available = true", name="files", type="file", accept=".json,application/json", multiple, required)
+          .frow(v-show="available")
+            button.mono(type="submit", :disabled="loading")
+              | Load
+      .frow
+        p &mdash;&nbsp;or&nbsp;&mdash;
+      .frow
+        a.mono(@click.prevent="sample", type="button", :disabled="loading")
+          | Load Sample Data
+      .frow
+        p
+          em WARNING 50+ MB download
+  .frow.centered(v-show="loading")
+    h2.loading loading...

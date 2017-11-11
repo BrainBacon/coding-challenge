@@ -1,0 +1,29 @@
+{
+  "name": "coding-challenge",
+  "main": "index.js",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=7.6"
+  },
+  "description": "Interactive map web application for Comma AI",
+  "homepage": "http://brainbacon.github.io/coding-challenge",
+  "repository": "BrainBacon/coding-challenge",
+  "author": "Brian Jesse <brian.jesse@gmail.com> (brianjesse.com)",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "npm run b -- local:client",
+    "b": "CONTEXT=$(pwd) npm explore begin-build -- npm run",
+    "p": "CONTEXT=$(pwd) npm explore begin-project -- npm run"
+  },
+  "dependencies": {
+    "begin-util": "1.0.0",
+    "kd-tree-javascript": "1.0.3"
+  },
+  "devDependencies": {
+    "begin-build": "0.1.3",
+    "begin-project": "0.1.1"
+  },
+  "// HACK: postcss-loader must have config": "",
+  "postcss": {}
+}

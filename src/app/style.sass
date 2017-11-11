@@ -1,0 +1,101 @@
+@import ~frow
+
+$background: #0c0e0f
+$font: 'Open Sans', sans-serif
+$animation-speed: 0.4s
+
+html, body
+  color: $near-white
+  height: 100%
+  margin: 0
+  padding: 0
+  background-color: $background
+
+body, p
+  font-family: $font
+  font-weight: 300
+  font-size: 28px
+  line-height: 38px
+
+  em
+    font-size: 18px
+
+h1
+  font-family: PTMono, monospace
+  font-size: 54px
+
+.logo
+  height: (34 / 20.5) * 38
+
+h2
+  font-size: 36px
+  line-height: 47px
+
+.mono, .header, h1, h2
+  font-weight: 600
+
+.mono, .header
+  font-family: PTMono, monospace
+  font-size: 18px
+
+.mono
+  color: $near-white
+
+.header
+  color: $near-black
+  box-shadow: 0 0 4px rgba(0,0,0,.14), 0 2px 10px rgba(0,0,0,.28)
+  z-index: 1
+  position: fixed
+  height: 60px
+  background-color: #fff
+  width: 100%
+  opacity: 0.97
+  padding: 0 15px
+
+  img
+    margin-right: 20px
+    height: 34px
+
+  &.v-enter-active
+    transition: transform $animation-speed
+    transform: translateY(0)
+
+  &.v-enter
+    transform: translateY(-100%)
+
+  &.v-leave-active
+    transition: transform $animation-speed
+    transform: translateY(-100%)
+
+  &.v-leave
+    transform: translateY(0)
+
+.map
+  height: 100%
+
+  &.v-enter-active
+    transition: transform $animation-speed
+    transform: scale(1)
+
+  &.v-enter
+    transform: scale(1.1)
+
+  &.v-leave-active
+    transition: opacity $animation-speed
+    opacity: 0
+
+  &.v-leave
+    opacity: 1
+
+.space
+  padding: 15px
+
+@keyframes pulse
+  from
+    opacity: 1
+  to
+    opacity: 0.5
+
+.loading
+  animation: pulse ($animation-speed * 4) alternate infinite ease-in-out
+
