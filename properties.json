@@ -6,7 +6,9 @@
       "color": "#0c0e0f",
       "maps": {
         "key": "AIzaSyDp45dzDt7PHTz4ecJdqGzdi_1Kb5xj5eE"
-      }
+      },
+      "cdn": "https://brainbacon.github.io/coding-challenge/",
+      "root": "https://brainbacon.github.io/coding-challenge/"
     }
   }
 }
