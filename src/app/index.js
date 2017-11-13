@@ -7,7 +7,7 @@ let tripsUrl = require('file-loader?name=resources/trips.json!../../docs/resourc
 let gradient = require('./gradient');
 let style = require('./map');
 
-const GRID_SIZE = 30;
+const GRID_SIZE = 60;
 const SIG_FIG = 1;
 
 module.exports = {
@@ -102,7 +102,7 @@ module.exports = {
         return null;
       }
       let out = this.getNode(node);
-      out.bounds.union(node.bounds);
+      // out.bounds.union(node.bounds);
       out.sum = node.sum;
       out.count = node.count;
       return out;
@@ -113,14 +113,14 @@ module.exports = {
         return null;
       }
       if (child.resolution > resolution) {
-        return this.bindChild(parent, this.traverse(child, resolution));
+        this.traverse(child, resolution);
       }
       return this.bindChild(parent, this.copyNode(child));
     },
 
     traverse(node, resolution) {
       if (!node.bounds.intersects(this.map.getBounds())) {
-        return null;
+        return;
       }
       let out = this.groupChild(null, node.left, resolution);
       out = this.groupChild(out, node.right, resolution);
@@ -128,36 +128,41 @@ module.exports = {
         out = this.bindChild(this.getNode(node), out);
       }
       if (!out) {
-        return null;
+        return;
       }
       if (out.sum < (10 ** -SIG_FIG)) {
         out.count = 0;
       }
-      /* eslint-disable */
-      for (let other of this.nodes) {
-        /* eslint-enable */
-        if (this.distance(other.bounds.getCenter(), out) < resolution) {
-          other.sum += out.sum;
-          other.count += out.count;
-          return null;
-        }
-      }
       this.nodes.push(out);
-      return null;
     },
 
-    getMarkers(projection) {
+    async getMarkers(projection) {
       if (!this.ready) {
         return;
       }
+      await this.mapsReady;
       this.clearMarkers();
       this.nodes = [];
       let ne = this.map.getBounds().getNorthEast();
       let pixel = projection.fromLatLngToDivPixel(ne);
       pixel.x -= GRID_SIZE;
       pixel.y += GRID_SIZE;
-      this.traverse(this.tree, this.distance(ne, projection.fromDivPixelToLatLng(pixel)));
-      this.nodes.forEach(node => {
+      let resolution = this.distance(ne, projection.fromDivPixelToLatLng(pixel));
+      this.traverse(this.tree, resolution);
+      this.nodes.reduce((out, node) => {
+        /* eslint-disable */
+        for (let other of out) {
+          /* eslint-enable */
+          if (this.distance(other.bounds.getCenter(), node) < resolution) {
+            other.bounds.extend(this.toLatLng(node));
+            other.sum += node.sum;
+            other.count += node.count;
+            return out;
+          }
+        }
+        out.push(node);
+        return out;
+      }, []).forEach(node => {
         let avg = node.sum / node.count;
         let scale = gradient.length * (avg / this.maxSpeed);
         this.markers.push(new this.maps.Marker({
@@ -199,7 +204,7 @@ module.exports = {
         proj = this.overlay.getProjection();
       };
       this.overlay.setMap(this.map);
-      this.map.addListener('bounds_changed', () => this.getMarkers(proj));
+      this.listener = this.map.addListener('bounds_changed', () => this.getMarkers(proj));
       this.map.fitBounds(this.tree.bounds);
     },
 
@@ -235,11 +240,12 @@ module.exports = {
 
     reset() {
       this.$refs.form.reset();
-      this.overlay.setMap(null);
-      this.maps.event.clearListeners(this.map, 'bounds_changed');
       delete this.tree;
       delete this.nodes;
+      this.overlay.setMap(null);
       delete this.overlay;
+      this.maps.event.removeListener(this.listener);
+      delete this.listener;
       this.clearMarkers();
       Object.assign(this.$data, this.$options.data.apply(this));
     },

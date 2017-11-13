@@ -6,4 +6,4 @@ append meta
 block scripts
   script.
     window.initMap=function(){window.mapsReady=true}
-  script(src=`https://maps.googleapis.com/maps/api/js?v=3&sensor=false&libraries=geometry&key=${props.maps.key}&callback=initMap` async defer)
+  script(src=`https://maps.googleapis.com/maps/api/js?v=3&libraries=geometry&key=${props.maps.key}&callback=initMap` async defer)
