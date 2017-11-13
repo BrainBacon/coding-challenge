@@ -8,6 +8,7 @@ let gradient = require('./gradient');
 let style = require('./map');
 
 const GRID_SIZE = 30;
+const SIG_FIG = 1;
 
 module.exports = {
   data: () => ({
@@ -96,6 +97,17 @@ module.exports = {
       this.markers = [];
     },
 
+    copyNode(node) {
+      if (!node) {
+        return null;
+      }
+      let out = this.getNode(node);
+      out.bounds.union(node.bounds);
+      out.sum = node.sum;
+      out.count = node.count;
+      return out;
+    },
+
     groupChild(parent, child, resolution) {
       if (!child) {
         return null;
@@ -103,7 +115,7 @@ module.exports = {
       if (child.resolution > resolution) {
         return this.bindChild(parent, this.traverse(child, resolution));
       }
-      return this.bindChild(parent, this.getNode(child));
+      return this.bindChild(parent, this.copyNode(child));
     },
 
     traverse(node, resolution) {
@@ -118,14 +130,16 @@ module.exports = {
       if (!out) {
         return null;
       }
-      if (out.sum < 0.1) {
-        return out;
+      if (out.sum < (10 ** -SIG_FIG)) {
+        out.count = 0;
       }
       /* eslint-disable */
       for (let other of this.nodes) {
         /* eslint-enable */
         if (this.distance(other.bounds.getCenter(), out) < resolution) {
-          return out;
+          other.sum += out.sum;
+          other.count += out.count;
+          return null;
         }
       }
       this.nodes.push(out);
@@ -161,32 +175,30 @@ module.exports = {
           },
           label: {
             fontSize: '12px',
-            text: `${avg.toFixed(1)}`,
+            text: `${avg.toFixed(SIG_FIG)}`,
           },
         }));
       });
     },
 
     initMap() {
-      if (this.map) {
-        this.map.fitBounds(this.tree.bounds);
-        return;
+      if (!this.map) {
+        this.map = new this.maps.Map(this.$refs.map, {
+          center: this.tree.bounds.getCenter(),
+          zoom: 13,
+          minZoom: 5,
+          mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
+          disableDefaultUI: true,
+        });
+        this.map.mapTypes.set('styled_map', new this.maps.StyledMapType(style));
+        this.map.setMapTypeId('styled_map');
       }
-      this.map = new this.maps.Map(this.$refs.map, {
-        center: this.tree.bounds.getCenter(),
-        zoom: 13,
-        minZoom: 5,
-        mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
-        disableDefaultUI: true,
-      });
-      this.map.mapTypes.set('styled_map', new this.maps.StyledMapType(style));
-      this.map.setMapTypeId('styled_map');
-      let overlay = new this.maps.OverlayView();
+      this.overlay = new this.maps.OverlayView();
       let proj;
-      overlay.draw = () => {
-        proj = overlay.getProjection();
+      this.overlay.draw = () => {
+        proj = this.overlay.getProjection();
       };
-      overlay.setMap(this.map);
+      this.overlay.setMap(this.map);
       this.map.addListener('bounds_changed', () => this.getMarkers(proj));
       this.map.fitBounds(this.tree.bounds);
     },
@@ -223,8 +235,11 @@ module.exports = {
 
     reset() {
       this.$refs.form.reset();
+      this.overlay.setMap(null);
+      this.maps.event.clearListeners(this.map, 'bounds_changed');
       delete this.tree;
       delete this.nodes;
+      delete this.overlay;
       this.clearMarkers();
       Object.assign(this.$data, this.$options.data.apply(this));
     },
