@@ -2,35 +2,32 @@
   // h1 Comma AI Coding Challenge
   transition
     .header(v-show="ready")
-      .frow.justify-between.height-100.items-center
-        .frow.items-center
+      .frow.height-100.justify-between.items-center
+        .frow
           img(src="./comma-dark.png")
           span comma.ai
-        a(type="button", @click.prevent="reset") clear
+        button.mono(@click.prevent="reset") clear
   transition
-    .map(v-show="ready", ref="map")
+    .map.height-100(v-show="ready", ref="map")
   .frow.centered(v-show="!ready && !loading")
     form(ref="form", @submit.prevent="submit", novalidate)
-      .frow.gutters
-        .col-xs-1-5
-          .frow.height-100.centered
-            img.logo(src="./comma-white.png")
-        .col-gs-4-5
-          h1 comma.ai
+      .frow.centered
+        img.logo(src="./comma-white.png")
+        h1 comma.ai
       .frow.row-start
         h2 Speed Analysis
       .frow
           label.mono.align-center
-            p Select local dataset
+            p Select local data set(s)
             input.mono(ref="input", @change="available = true", name="files", type="file", accept=".json,application/json", multiple, required)
-          .frow(v-show="available")
-            button.mono(type="submit", :disabled="loading")
-              | Load
+      .frow.justify-center
+        .col-sm-3-5
+          button.mono.width-100(type="submit", :disabled="!available") Load
       .frow
         p &mdash;&nbsp;or&nbsp;&mdash;
-      .frow
-        a.mono(@click.prevent="sample", type="button", :disabled="loading")
-          | Load Sample Data
+      .frow.justify-center
+        .col-sm-3-5
+          button.mono.width-100(@click.prevent="sample") Load Sample Data
       .frow
         p
           em WARNING 50+ MB download

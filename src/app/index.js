@@ -1,21 +1,20 @@
-let { kdTree } = require('kd-tree-javascript/kdTree.js');
 let { root } = require('begin-build/props');
+let KDTree = require('kd-tree-javascript/kdTree').kdTree;
 /* eslint-disable */
 let axios = require('axios');
 let tripsUrl = require('file-loader?name=resources/trips.json!../../docs/resources/trips.json');
 /* eslint-enable */
 let gradient = require('./gradient');
 let style = require('./map');
-let pin = require('./pin.svg');
 
-const GRID_SIZE = 150;
+const GRID_SIZE = 30;
 
 module.exports = {
   data: () => ({
-    extremes: { speed: 0, lat: [90, -90], lng: [180, -180] },
-    ready: false,
     available: false,
     loading: false,
+    maxSpeed: 0,
+    ready: false,
   }),
 
   created() {
@@ -26,30 +25,50 @@ module.exports = {
         resolve(window.google.maps);
       }
     });
-    this.styles = gradient.map(color => ({
-      url: `data:image/svg+xml,${encodeURIComponent(pin.replace(/{{fill}}/g, color))}`,
-      scaledSize: {
-        width: 64,
-        height: 78,
-      },
-    }));
   },
 
   methods: {
-    distance(a, b) {
-      return this.maps.geometry.spherical.computeDistanceBetween(a, b);
-    },
-
-    kdDistance(a, b) {
-      return this.distance(new this.maps.LatLng(a.lat, a.lng), new this.maps.LatLng(b.lat, b.lng));
-    },
-
-    bound(parent, child) {
-      if (child) {
-        parent.bounds.union(child.bounds);
-        parent.avg += child.avg;
-        parent.avg /= 2;
+    toLatLng(obj) {
+      if (obj instanceof this.maps.LatLng) {
+        return obj;
       }
+      return new this.maps.LatLng(obj.lat, obj.lng);
+    },
+
+    getNode(node) {
+      let bounds = new this.maps.LatLngBounds();
+      bounds.extend(this.toLatLng(node));
+      return {
+        lat: node.lat,
+        lng: node.lng,
+        speed: node.speed,
+        sum: node.speed,
+        count: 1,
+        bounds,
+      };
+    },
+
+    bindChild(parent, child) {
+      if (!child) {
+        return null;
+      }
+      if (parent) {
+        parent.sum += child.sum;
+        parent.count += child.count;
+        parent.bounds.union(child.bounds);
+      }
+      return child;
+    },
+
+    distance(a, b) {
+      if (!b) {
+        b = a.getSouthWest();
+        a = a.getNorthEast();
+      } else {
+        a = this.toLatLng(a);
+        b = this.toLatLng(b);
+      }
+      return this.maps.geometry.spherical.computeDistanceBetween(a, b);
     },
 
     getTree(node) {
@@ -57,57 +76,17 @@ module.exports = {
         return null;
       }
       let { obj, left, right } = node;
-      obj.left = this.getTree(left);
-      obj.right = this.getTree(right);
-      obj.bounds = new this.maps.LatLngBounds();
-      obj.bounds.extend(obj);
-      obj.avg = obj.speed;
-      this.bound(obj, obj.left);
-      this.bound(obj, obj.right);
-      obj.resolution = this.distance(obj.bounds.getNorthEast(), obj.bounds.getSouthWest());
-      return obj;
+      this.maxSpeed = Math.max(obj.speed, this.maxSpeed);
+      node = this.getNode(obj);
+      node.left = this.bindChild(node, this.getTree(left));
+      node.right = this.bindChild(node, this.getTree(right));
+      node.resolution = this.distance(node.bounds);
+      return node;
     },
 
-    surrounds(node, bounds) {
-      return bounds.contains(node.bounds.getNorthEast())
-        && bounds.contains(node.bounds.getSouthWest());
-    },
-
-    getStyle(avg) {
-      let i = ~~Math.min(this.styles.length * (avg / this.extremes.speed), this.styles.length - 1);
-      return this.styles[i];
-    },
-
-    traverse(node, resolution, bounds) {
-      if (!node) {
-        return;
-      }
-      if (bounds) {
-        if (!node.bounds.intersects(bounds)) {
-          return;
-        }
-        if (this.surrounds(node, bounds)) {
-          this.traverse(node, resolution);
-          return;
-        }
-      }
-      if (node.resolution < resolution) {
-        let position;
-        if (node.resolution > 0) {
-          position = new this.maps.LatLng(node.lat, node.lng);
-        } else {
-          position = node.bounds.getCenter();
-        }
-        this.markers.push(new this.maps.Marker({
-          map: this.map,
-          position,
-          label: `${node.avg.toFixed(1)}`,
-          icon: this.getStyle(node.avg),
-        }));
-        return;
-      }
-      this.traverse(node.left, resolution, bounds);
-      this.traverse(node.right, resolution, bounds);
+    initTree(coords) {
+      let kd = new KDTree(coords, (a, b) => this.distance(a, b), ['lat', 'lng']);
+      this.tree = this.getTree(kd.root);
     },
 
     clearMarkers() {
@@ -117,62 +96,111 @@ module.exports = {
       this.markers = [];
     },
 
-    getMarkers() {
-      this.clearMarkers();
-      let bounds = this.map.getBounds();
-      let scale = 2 ** this.map.getZoom();
-      let ne = bounds.getNorthEast();
-      let projection = this.map.getProjection();
-      let point = projection.fromLatLngToPoint(ne);
-      let normalize = n => ((n * scale) - GRID_SIZE) / scale;
-      let sw = new this.maps.Point(normalize(point.x), normalize(point.y));
-      let resolution = this.distance(ne, projection.fromPointToLatLng(sw));
-      this.traverse(this.tree, resolution, bounds);
+    groupChild(parent, child, resolution) {
+      if (!child) {
+        return null;
+      }
+      if (child.resolution > resolution) {
+        return this.bindChild(parent, this.traverse(child, resolution));
+      }
+      return this.bindChild(parent, this.getNode(child));
     },
 
-    initMap(center) {
-      if (!this.map) {
-        this.map = new this.maps.Map(this.$refs.map, {
-          center,
-          zoom: 13,
-          minZoom: 5,
-          mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
-          disableDefaultUI: true,
-        });
-        this.map.mapTypes.set('styled_map', new this.maps.StyledMapType(style));
-        this.map.setMapTypeId('styled_map');
+    traverse(node, resolution) {
+      if (!node.bounds.intersects(this.map.getBounds())) {
+        return null;
       }
+      let out = this.groupChild(null, node.left, resolution);
+      out = this.groupChild(out, node.right, resolution);
+      if (this.map.getBounds().contains(this.toLatLng(node))) {
+        out = this.bindChild(this.getNode(node), out);
+      }
+      if (!out) {
+        return null;
+      }
+      if (out.sum < 0.1) {
+        return out;
+      }
+      /* eslint-disable */
+      for (let other of this.nodes) {
+        /* eslint-enable */
+        if (this.distance(other.bounds.getCenter(), out) < resolution) {
+          return out;
+        }
+      }
+      this.nodes.push(out);
+      return null;
+    },
+
+    getMarkers(projection) {
+      if (!this.ready) {
+        return;
+      }
+      this.clearMarkers();
+      this.nodes = [];
+      let ne = this.map.getBounds().getNorthEast();
+      let pixel = projection.fromLatLngToDivPixel(ne);
+      pixel.x -= GRID_SIZE;
+      pixel.y += GRID_SIZE;
+      this.traverse(this.tree, this.distance(ne, projection.fromDivPixelToLatLng(pixel)));
+      this.nodes.forEach(node => {
+        let avg = node.sum / node.count;
+        let scale = gradient.length * (avg / this.maxSpeed);
+        this.markers.push(new this.maps.Marker({
+          map: this.map,
+          position: node.bounds.getCenter(),
+          icon: {
+            path: 'M160 0 a 160 160 0 1 0 160 160 L 320 0 Z',
+            rotation: 135,
+            scale: (44 / 390),
+            fillColor: gradient[~~Math.min(scale, gradient.length - 1)],
+            fillOpacity: 1,
+            strokeColor: 'black',
+            strokeWeight: 2,
+            labelOrigin: { x: 160, y: 160 },
+          },
+          label: {
+            fontSize: '12px',
+            text: `${avg.toFixed(1)}`,
+          },
+        }));
+      });
+    },
+
+    initMap() {
+      if (this.map) {
+        this.map.fitBounds(this.tree.bounds);
+        return;
+      }
+      this.map = new this.maps.Map(this.$refs.map, {
+        center: this.tree.bounds.getCenter(),
+        zoom: 13,
+        minZoom: 5,
+        mapTypeControlOptions: { mapTypeIds: ['styled_map'] },
+        disableDefaultUI: true,
+      });
+      this.map.mapTypes.set('styled_map', new this.maps.StyledMapType(style));
+      this.map.setMapTypeId('styled_map');
+      let overlay = new this.maps.OverlayView();
+      let proj;
+      overlay.draw = () => {
+        proj = overlay.getProjection();
+      };
+      overlay.setMap(this.map);
+      this.map.addListener('bounds_changed', () => this.getMarkers(proj));
+      this.map.fitBounds(this.tree.bounds);
     },
 
     async prepare(groups) {
       let coords = groups.reduce((arr, trip) => arr.concat(trip.coords), []);
-      coords = coords.map(({ lat, lng, speed }) => { // dist, index
-        this.extremes.speed = Math.max(speed, this.extremes.speed);
-        this.extremes.lat[0] = Math.min(lat, this.extremes.lat[0]);
-        this.extremes.lat[1] = Math.max(lat, this.extremes.lat[1]);
-        this.extremes.lng[0] = Math.min(lng, this.extremes.lng[0]);
-        this.extremes.lng[1] = Math.max(lng, this.extremes.lng[1]);
-        return { lat, lng, speed };
-      });
       this.maps = await this.mapsReady;
-      let bounds = new this.maps.LatLngBounds();
-      bounds.extend(new this.maps.LatLng(this.extremes.lat[0], this.extremes.lng[0]));
-      bounds.extend(new this.maps.LatLng(this.extremes.lat[1], this.extremes.lng[1]));
-      /* eslint-disable new-cap */
-      let kd = new kdTree(coords, (...args) => this.kdDistance(...args), ['lat', 'lng']);
-      /* eslint-enable new-cap */
-      let center = bounds.getCenter();
-      kd.nearest(center, 1);
-      this.tree = this.getTree(kd.root);
+      this.initTree(coords);
       this.loading = false;
       this.ready = true;
-      this.initMap(center);
-      this.map.fitBounds(bounds);
-      this.boundsListener = this.map.addListener('bounds_changed', () => this.getMarkers());
+      this.initMap();
     },
 
     async submit() {
-      this.available = false;
       this.loading = true;
       let res = await Promise.all(Array.from(this.$refs.input.files).map(async file => {
         let reader = new FileReader();
@@ -188,7 +216,6 @@ module.exports = {
     },
 
     async sample() {
-      this.available = false;
       this.loading = true;
       let { data } = await axios.get(tripsUrl);
       this.prepare(Object.values(data));
@@ -196,8 +223,8 @@ module.exports = {
 
     reset() {
       this.$refs.form.reset();
-      this.maps.event.removeListener(this.boundsListener);
       delete this.tree;
+      delete this.nodes;
       this.clearMarkers();
       Object.assign(this.$data, this.$options.data.apply(this));
     },

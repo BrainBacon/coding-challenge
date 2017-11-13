@@ -1,7 +1,5 @@
 @import ~frow
 
-$background: #0c0e0f
-$font: 'Open Sans', sans-serif
 $animation-speed: 0.4s
 
 html, body
@@ -9,36 +7,35 @@ html, body
   height: 100%
   margin: 0
   padding: 0
-  background-color: $background
+  background-color: #0c0e0f
 
 body, p
-  font-family: $font
+  font-family: 'Open Sans', sans-serif
   font-weight: 300
   font-size: 28px
   line-height: 38px
-
   em
     font-size: 18px
 
-h1
-  font-family: PTMono, monospace
-  font-size: 54px
-
 .logo
   height: (34 / 20.5) * 38
+  margin-right: 15px
+
+.mono, .header, h1, h2
+  font-weight: 600
+
+h1, button, input, .header
+  font-family: PTMono, monospace
+  font-size: 18px
+
+h1
+  font-size: 54px
 
 h2
   font-size: 36px
   line-height: 47px
 
-.mono, .header, h1, h2
-  font-weight: 600
-
-.mono, .header
-  font-family: PTMono, monospace
-  font-size: 18px
-
-.mono
+input, button
   color: $near-white
 
 .header
@@ -51,44 +48,31 @@ h2
   width: 100%
   opacity: 0.97
   padding: 0 15px
-
   img
-    margin-right: 20px
+    margin-right: 15px
     height: 34px
-
   &.v-enter-active
     transition: transform $animation-speed
     transform: translateY(0)
-
   &.v-enter
     transform: translateY(-100%)
-
   &.v-leave-active
     transition: transform $animation-speed
     transform: translateY(-100%)
-
   &.v-leave
     transform: translateY(0)
 
 .map
-  height: 100%
-
   &.v-enter-active
     transition: transform $animation-speed
     transform: scale(1)
-
   &.v-enter
     transform: scale(1.1)
-
   &.v-leave-active
     transition: opacity $animation-speed
     opacity: 0
-
   &.v-leave
     opacity: 1
-
-.space
-  padding: 15px
 
 @keyframes pulse
   from

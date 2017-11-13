@@ -41,7 +41,7 @@
         "visibility": "on"
       },
       {
-        "color": "#e0efef"
+        "color": "#ECEFF1"
       }
     ]
   },
@@ -53,10 +53,10 @@
         "visibility": "on"
       },
       {
-        "hue": "#1900ff"
+        "hue": "#4FC3F7"
       },
       {
-        "color": "#c0e8e8"
+        "color": "#E1F5FE"
       }
     ]
   },
@@ -77,7 +77,7 @@
     "elementType": "all",
     "stylers": [
       {
-        "color": "#7dcdcd"
+        "color": "#03A9F4"
       }
     ]
   }
