@@ -12,7 +12,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "npm run b -- start:client",
+    "start": "npm run b start:client",
     "b": "CONTEXT=$(pwd) npm explore begin-build -- npm run"
   },
   "dependencies": {
@@ -20,7 +20,7 @@
     "kd-tree-javascript": "1.0.3"
   },
   "devDependencies": {
-    "begin-build": "0.1.5"
+    "begin-build": "0.3.4"
   },
   "// HACK: postcss-loader must have config": "",
   "postcss": {}
